@@ -18,7 +18,9 @@
 #define LEVEL_SENSOR_HI		PB1
 #define BTN					PB0
 #define EXT_DIODE			PD7
-#define WATER_CHANGE_MODE_DURATION	(45*60)
+#define WATER_CHANGE_MODE_DURATION	(60*60)
+#define GUARD_TIME_WCM		0		//water change mode
+#define GUARD_TIME_NWCM		(5*60)	//not water change mode
 
 
 #if LOOP_PERIOD > 1000
@@ -27,7 +29,7 @@
 
 volatile uint16_t GUARD_COUNTER=0;
 volatile bool WATER_CHANGE_MODE = false;
-volatile uint16_t GUARD_TIME = 5*60;
+volatile uint16_t GUARD_TIME = GUARD_TIME_NWCM;
 
 bool switch_relay_sump_pump_on_low_lvl_sensor();
 
@@ -117,11 +119,22 @@ bool monitor_water_change_mode_long_press(){
 	return water_change_mode_trigger_count > 2;
 }
 
+void update_guard_time_on_wCM(){
+	if(WATER_CHANGE_MODE){
+		GUARD_TIME = GUARD_TIME_WCM;
+	}
+	else{
+		GUARD_TIME = GUARD_TIME_NWCM;
+	}
+	GUARD_COUNTER = GUARD_TIME;	//reset GUARD_COUNTER
+}
+
 bool monitor_water_change_mode_button(){
 	bool state_changed = false;
 	if(monitor_water_change_mode_long_press()){
 		WATER_CHANGE_MODE ^= true;
 		state_changed = true;
+		update_guard_time_on_wCM();
 	}
 
 	if(WATER_CHANGE_MODE){
@@ -137,24 +150,21 @@ void handle_water_change_mode_state(){
 	static uint16_t water_change_mode_counter = 0;
 	if(monitor_water_change_mode_button()){
 		water_change_mode_counter = 0;
-		if(WATER_CHANGE_MODE){
-			GUARD_TIME = 30;
-		}
-		else{
-			GUARD_TIME = 5*60;
-		}
-		GUARD_COUNTER = GUARD_TIME;
+
 	}
 	if(WATER_CHANGE_MODE and water_change_mode_counter < WATER_CHANGE_MODE_DURATION){
 		water_change_mode_counter++;
 	}
 	else if(WATER_CHANGE_MODE and water_change_mode_counter >= WATER_CHANGE_MODE_DURATION){
 		WATER_CHANGE_MODE = false;
+		update_guard_time_on_wCM();
 		water_change_mode_counter = 0;
 	}
 	else{
 		water_change_mode_counter = 0;
 	}
+
+
 }
 
 void blink_short_and_sleep(){
