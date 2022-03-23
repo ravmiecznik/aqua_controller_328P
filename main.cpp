@@ -18,8 +18,9 @@
 #define LEVEL_SENSOR_HI		PB1
 #define BTN					PB0
 #define EXT_DIODE			PD7
-#define WATER_CHANGE_MODE_DURATION	(60*60)
+
 #define GUARD_TIME_WCM		0		//water change mode
+#define WATER_CHANGE_MODE_DURATION	(60*60)
 #define GUARD_TIME_NWCM		(5*60)	//not water change mode
 
 
@@ -54,15 +55,6 @@ ISR(PCINT0_vect){
 	switch_relay_sump_pump_on_low_lvl_sensor();
 }
 
-void relay_control(RELAY_STATE::state state, uint8_t relay_num){
-	if(state == RELAY_STATE::on){
-		PORTB &= ~_BV(relay_num);
-	}
-	else{
-		PORTB |= _BV(relay_num);
-	}
-}
-
 
 bool portb_get_pin(uint8_t pin){
 	uint8_t samples_num = 6;
@@ -74,6 +66,21 @@ bool portb_get_pin(uint8_t pin){
 	return pin_value > samples_num/2;
 }
 
+bool relay_control(RELAY_STATE::state state, uint8_t relay_num){
+	bool pin_value = portb_get_pin(relay_num);
+	if(state == RELAY_STATE::on and pin_value){
+		PORTB &= ~_BV(relay_num);
+		return true;
+	}
+	else if(state == RELAY_STATE::off and not pin_value){
+		PORTB |= _BV(relay_num);
+		return false;
+	}
+	return portb_get_pin(relay_num);
+}
+
+
+
 
 bool switch_relay_sump_pump_on_low_lvl_sensor(){
 	/*
@@ -83,25 +90,25 @@ bool switch_relay_sump_pump_on_low_lvl_sensor(){
 	if(not portb_get_pin(LEVEL_SENSOR_LOW)){		//enable relay if level alarm
 		relay_control(RELAY_STATE::on, RELAY_SUMP_PUMP);
 		GUARD_COUNTER = 0;
-		return false;
+		return true;
 	}
 	else{
 		if(GUARD_COUNTER>=GUARD_TIME){
-			relay_control(RELAY_STATE::off, RELAY_SUMP_PUMP);	//disable relay if not level alarm (enable pump)
-			return true;
+			return relay_control(RELAY_STATE::off, RELAY_SUMP_PUMP);	//disable relay if not level alarm (enable pump)
 		}
 	}
 	return false;
 }
 
 
-void enable_sump_pump_after_guard_time(volatile uint16_t& guard_count){
+bool enable_sump_pump_after_guard_time(volatile uint16_t& guard_count){
 	if(guard_count < GUARD_TIME){
 		guard_count++;
 	}
 	else if(guard_count>=GUARD_TIME){
-		switch_relay_sump_pump_on_low_lvl_sensor();
+		return switch_relay_sump_pump_on_low_lvl_sensor();
 	}
+	return false;
 }
 
 bool monitor_water_change_mode_long_press(){
@@ -132,7 +139,9 @@ void update_guard_time_on_wCM(){
 bool monitor_water_change_mode_button(){
 	bool state_changed = false;
 	if(monitor_water_change_mode_long_press()){
+//	if(true){
 		WATER_CHANGE_MODE ^= true;
+//		WATER_CHANGE_MODE = true;
 		state_changed = true;
 		update_guard_time_on_wCM();
 	}
@@ -193,6 +202,15 @@ void blink_long_and_sleep(){
 	}
 }
 
+uint32_t abs(uint32_t a, uint32_t b){
+	//condition ? result_if_true : result_if_false
+	return a > b ? a - b : b -a;
+}
+
+uint32_t loop_seconds(uint32_t loop_count){
+	return loop_count/(1000/LOOP_PERIOD);
+}
+
 int main(){
 	DDRB &= ~_BV(LEVEL_SENSOR_LOW) & ~_BV(LEVEL_SENSOR_HI) & ~_BV(BTN);		//as input
 	PORTB |= _BV(LEVEL_SENSOR_LOW) | _BV(LEVEL_SENSOR_HI) | _BV(BTN);		//pull up
@@ -208,11 +226,22 @@ int main(){
 	GUARD_COUNTER=GUARD_TIME;
 	switch_relay_sump_pump_on_low_lvl_sensor();
 	sei();
-	uint16_t loop_count=0;
+	uint32_t loop_count=0;
+	bool pump_was_started = false;
+	uint32_t sump_pump_start_tstamp = 0;
+	uint32_t feed_pump_start_tstamp = 0;
 
 	while(true){
 		if(not( loop_count % (1000/LOOP_PERIOD))){				//every second check
-			enable_sump_pump_after_guard_time(GUARD_COUNTER);
+			pump_was_started = not enable_sump_pump_after_guard_time(GUARD_COUNTER);
+
+			if(pump_was_started and WATER_CHANGE_MODE){
+				sump_pump_start_tstamp = loop_seconds(loop_count);
+			}
+			else if (not WATER_CHANGE_MODE){
+				sump_pump_start_tstamp = 0;
+			}
+
 			handle_water_change_mode_state();
 			if(GUARD_COUNTER>=GUARD_TIME){
 				blink_short_and_sleep();
@@ -224,14 +253,34 @@ int main(){
 		else{
 			_delay_ms(LOOP_PERIOD);
 		}
-		loop_count++;
 
-		if(WATER_CHANGE_MODE and portb_get_pin(LEVEL_SENSOR_HI)){
-			relay_control(RELAY_STATE::on, RELAY_FEED_PUMP);
+
+
+
+		if(WATER_CHANGE_MODE){
+			if(portb_get_pin(LEVEL_SENSOR_HI)){
+				relay_control(RELAY_STATE::on, RELAY_FEED_PUMP);
+				feed_pump_start_tstamp = loop_seconds(loop_count);
+			}
+
+			else{
+				if(( abs( sump_pump_start_tstamp, feed_pump_start_tstamp) < 5)){
+					if( sump_pump_start_tstamp and abs( loop_seconds(loop_count), sump_pump_start_tstamp) > 30){
+						relay_control(RELAY_STATE::off, RELAY_FEED_PUMP);
+						feed_pump_start_tstamp = 0;
+					}
+				}
+				else{
+					relay_control(RELAY_STATE::off, RELAY_FEED_PUMP);
+					feed_pump_start_tstamp = 0;
+				}
+			}
 		}
 		else{
 			relay_control(RELAY_STATE::off, RELAY_FEED_PUMP);
+			feed_pump_start_tstamp = 0;
 		}
+		loop_count++;
 
 
 	}
