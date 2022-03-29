@@ -16,6 +16,7 @@
 #define RELAY_FEED_PUMP 	PB3
 #define LEVEL_SENSOR_LOW	PB2
 #define LEVEL_SENSOR_HI		PB1
+#define ARDUINO_LED			PB5
 #define BTN					PB0
 #define EXT_DIODE			PD7
 #define WATER_CHANGE_MODE_DURATION	(45*60)
@@ -187,7 +188,7 @@ int main(){
 	DDRB &= ~_BV(LEVEL_SENSOR_LOW) & ~_BV(LEVEL_SENSOR_HI) & ~_BV(BTN);		//as input
 	PORTB |= _BV(LEVEL_SENSOR_LOW) | _BV(LEVEL_SENSOR_HI) | _BV(BTN);		//pull up
 	DDRB |= _BV(RELAY_SUMP_PUMP)
-			| _BV(RELAY_FEED_PUMP);		//as output
+			| _BV(RELAY_FEED_PUMP) | _BV(ARDUINO_LED);		//as output
 
 	DDRD |= _BV(EXT_DIODE);
 
@@ -210,6 +211,7 @@ int main(){
 			else{
 				blink_long_and_sleep();
 			}
+			PORTB ^= _BV(ARDUINO_LED);
 		}
 		else{
 			_delay_ms(LOOP_PERIOD);
