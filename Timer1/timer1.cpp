@@ -12,6 +12,7 @@ void null_func(void) {
 
 }
 
+
 void_void_fptr timer1_compa_func = &null_func;
 volatile uint16_t _delay_counter_comp1a = 0;
 
@@ -26,6 +27,10 @@ ISR(TIMER1_COMPA_vect){
 		_delay_counter_comp1a--;
 	}
 }
+
+//ISR(TIMER0_COMPA_vect){
+//	PORTB ^= _BV(PB5);
+//}
 
 void register_timer1_compa_func(void_void_fptr func){
 	timer1_compa_func = func;
@@ -73,6 +78,24 @@ void compa_int_delay_s(uint16_t seconds, tccrb_reg& tccrb, volatile uint16_t* oc
 		*ocr = seconds*timer_freq;
 
 		setup_timer_ociea((tccrb_reg&)TCCR1B, (timsk_reg&)TIMSK1, TccrbClockSelect::pre1024);
+}
+
+void set_fast_pwm_timer0(uint8_t pwm){
+	((tccra_reg&)TCCR0A).com_a_1 = 0;
+	((tccra_reg&)TCCR0A).wgm_0 = 0;
+	((tccra_reg&)TCCR0A).wgm_1 = 0;
+	if(pwm>0){
+		((tccra_reg&)TCCR0A).com_a_1 = 1;
+		((tccra_reg&)TCCR0A).wgm_0 = 1;
+		((tccra_reg&)TCCR0A).wgm_1 = 1;
+		((tccrb_reg&)TCCR0B).cs = TccrbClockSelect::pre1;
+
+		pwm = pwm>100 ? 100:pwm;
+	//	pwm = 100 - pwm;
+	//
+		uint16_t pwm_raw = 0xff*pwm/100;
+		OCR0A = pwm_raw;
+	}
 }
 
 

@@ -18,7 +18,9 @@
 #define LEVEL_SENSOR_HI		PB1
 #define ARDUINO_LED			PB5
 #define BTN					PB0
+#define OC0A				PD6
 #define EXT_DIODE			PD7
+
 
 #define GUARD_TIME_WCM		0		//water change mode
 #define WATER_CHANGE_MODE_DURATION	(60*60)
@@ -218,7 +220,7 @@ int main(){
 	DDRB |= _BV(RELAY_SUMP_PUMP)
 			| _BV(RELAY_FEED_PUMP) | _BV(ARDUINO_LED);		//as output
 
-	DDRD |= _BV(EXT_DIODE);
+	DDRD |= _BV(EXT_DIODE) | _BV(OC0A);
 
 	enable_pcint_check_interrupt();
 	relay_control(RELAY_STATE::off, RELAY_SUMP_PUMP);
@@ -232,7 +234,16 @@ int main(){
 	uint32_t sump_pump_start_tstamp = 0;
 	uint32_t feed_pump_start_tstamp = 0;
 
+
+//	PORTD |= _BV(OC0A);
+	PORTD &= ~_BV(OC0A);
+	uint8_t fan_speed = 100;
+	set_fast_pwm_timer0(fan_speed);
 	while(true){
+		if(not( loop_count % (500/LOOP_PERIOD))){
+			set_fast_pwm_timer0(fan_speed);
+			fan_speed = fan_speed >= 100 ? 2:fan_speed+5;
+		}
 		if(not( loop_count % (1000/LOOP_PERIOD))){				//every second check
 			pump_was_started = not enable_sump_pump_after_guard_time(GUARD_COUNTER);
 
