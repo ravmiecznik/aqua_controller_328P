@@ -11,6 +11,10 @@
 #include <avr/interrupt.h>
 #include "Timer1/timer1.h"
 #include "avr_ports/avr_ports.h"
+#include "atm328_usart/usart.h"
+
+
+
 
 #define LOOP_PERIOD			500		//cant exceed 1000
 #define GUARD_TIME_WCM		0		//water change mode
@@ -30,6 +34,8 @@ AvrPin level_sensor_hi	(PIN::pin1, (AvrPort&)PINB, PIN::in);	//Arduino D09
 AvrPin button			(PIN::pin0, (AvrPort&)PINB, PIN::in);	//Arduino D08
 AvrPin ext_diode		(PIN::pin7, (AvrPort&)PIND, PIN::out);	//Arduino D07
 AvrPin out_compare_0A	(PIN::pin6, (AvrPort&)PIND, PIN::out);	//Arduino D06
+
+Usart usart(usart0, 9600, 20, 20);
 
 volatile uint16_t GUARD_COUNTER=0;
 volatile bool WATER_CHANGE_MODE = false;
@@ -203,17 +209,51 @@ void blink_long_and_sleep(AvrPin ext_diode){
 	}
 }
 
-uint32_t abs(uint32_t a, uint32_t b){
+
+uint32_t absolute(uint32_t a, uint32_t b){
 	return a > b ? a - b : b -a;
 }
+
 
 uint32_t loop_seconds(uint32_t loop_count){
 	return loop_count/(1000/LOOP_PERIOD);
 }
 
 
+/****************************************************************/
+/*
+ * Configuration of standard output for functions printf, printf_p and so on
+ */
+static int put(char c, FILE *stream){
+	usart.Putchar(c);
+	return 0;
+}
+static FILE uartout = {0};
+void setup_stdout_for_printf(){
+	fdev_setup_stream(&uartout, put, NULL, _FDEV_SETUP_WRITE);
+	stdout = &uartout;
+	stderr = &uartout;
+}
+/****************************************************************/
+
+
+void uart_init(uint32_t baudrate){
+	baudrate = F_CPU/16/baudrate -1;
+	if ( baudrate & 0x8000 ) {
+		UCSR0A = (1<<U2X0);  //Enable 2x speed
+		baudrate &= ~0x8000;
+	}
+	UBRR0H = (uint8_t)(baudrate>>8);
+	UBRR0L = (uint8_t) baudrate;
+
+	/* Enable USART receiver and transmitter and receive complete interrupt */
+	UCSR0B = _BV(RXCIE0)|_BV(RXEN0)|_BV(TXEN0);
+	UCSR0C = _BV(UCSZ01) | _BV(UCSZ00);
+}
 
 int main(){
+//	uart_init(9600);
+	setup_stdout_for_printf();
 	level_sensor_low = PIN::hi;
 	out_compare_0A = PIN::lo;
 	enable_pcint_check_interrupt();
@@ -252,9 +292,12 @@ int main(){
 			else{
 				blink_long_and_sleep(ext_diode);
 			}
+			arduino_led.toggle();
+			printf("hello\n");
 		}
 		else{
 			_delay_ms(LOOP_PERIOD);
+
 		}
 
 
@@ -267,8 +310,8 @@ int main(){
 			}
 
 			else{
-				if(( abs( sump_pump_start_tstamp, feed_pump_start_tstamp) < 5)){
-					if( sump_pump_start_tstamp and abs( loop_seconds(loop_count), sump_pump_start_tstamp) > 30){
+				if(( absolute( sump_pump_start_tstamp, feed_pump_start_tstamp) < 5)){
+					if( sump_pump_start_tstamp and absolute( loop_seconds(loop_count), sump_pump_start_tstamp) > 30){
 						relay_control(RELAY_STATE::off, relay_feed_pump);
 						feed_pump_start_tstamp = 0;
 					}
