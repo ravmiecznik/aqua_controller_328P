@@ -56,10 +56,6 @@ void enable_pcint_check_interrupt(){
 }
 
 
-//void disable_pcint_check_interrupt(){
-//	PCICR &= ~_BV(PCIE0);
-//}
-
 ISR(PCINT0_vect){
 	switch_relay_sump_pump_on_low_lvl_sensor(level_sensor_low, relay_sump_pump);
 	arduino_led.toggle();
@@ -237,22 +233,7 @@ void setup_stdout_for_printf(){
 /****************************************************************/
 
 
-void uart_init(uint32_t baudrate){
-	baudrate = F_CPU/16/baudrate -1;
-	if ( baudrate & 0x8000 ) {
-		UCSR0A = (1<<U2X0);  //Enable 2x speed
-		baudrate &= ~0x8000;
-	}
-	UBRR0H = (uint8_t)(baudrate>>8);
-	UBRR0L = (uint8_t) baudrate;
-
-	/* Enable USART receiver and transmitter and receive complete interrupt */
-	UCSR0B = _BV(RXCIE0)|_BV(RXEN0)|_BV(TXEN0);
-	UCSR0C = _BV(UCSZ01) | _BV(UCSZ00);
-}
-
 int main(){
-//	uart_init(9600);
 	setup_stdout_for_printf();
 	level_sensor_low = PIN::hi;
 	out_compare_0A = PIN::lo;
