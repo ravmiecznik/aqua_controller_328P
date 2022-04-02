@@ -10,18 +10,9 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include "Timer1/timer1.h"
+#include "avr_ports/avr_ports.h"
 
 #define LOOP_PERIOD			500		//cant exceed 1000
-#define RELAY_SUMP_PUMP 	PB4
-#define RELAY_FEED_PUMP 	PB3
-#define LEVEL_SENSOR_LOW	PB2
-#define LEVEL_SENSOR_HI		PB1
-#define ARDUINO_LED			PB5
-#define BTN					PB0
-#define OC0A				PD6
-#define EXT_DIODE			PD7
-
-
 #define GUARD_TIME_WCM		0		//water change mode
 #define WATER_CHANGE_MODE_DURATION	(60*60)
 #define GUARD_TIME_NWCM		(5*60)	//not water change mode
@@ -31,11 +22,20 @@
 	#error "LOOP_PERIOD exceed 1000"
 #endif
 
+AvrPin arduino_led		(PIN::pin5, (AvrPort&)PINB, PIN::out);	//Arduino D13
+AvrPin relay_sump_pump	(PIN::pin4, (AvrPort&)PINB, PIN::out);	//Arduino D12
+AvrPin relay_feed_pump	(PIN::pin3, (AvrPort&)PINB, PIN::out);	//Arduino D11
+AvrPin level_sensor_low	(PIN::pin2, (AvrPort&)PINB, PIN::in);	//Arduino D10
+AvrPin level_sensor_hi	(PIN::pin1, (AvrPort&)PINB, PIN::in);	//Arduino D09
+AvrPin button			(PIN::pin0, (AvrPort&)PINB, PIN::in);	//Arduino D08
+AvrPin ext_diode		(PIN::pin7, (AvrPort&)PIND, PIN::out);	//Arduino D07
+AvrPin out_compare_0A	(PIN::pin6, (AvrPort&)PIND, PIN::out);	//Arduino D06
+
 volatile uint16_t GUARD_COUNTER=0;
 volatile bool WATER_CHANGE_MODE = false;
 volatile uint16_t GUARD_TIME = GUARD_TIME_NWCM;
 
-bool switch_relay_sump_pump_on_low_lvl_sensor();
+bool switch_relay_sump_pump_on_low_lvl_sensor(AvrPin level_sensor_low, AvrPin relay_sump_pump);
 
 namespace RELAY_STATE {
 	enum state {
@@ -46,7 +46,7 @@ namespace RELAY_STATE {
 
 void enable_pcint_check_interrupt(){
 	PCICR |= _BV(PCIE0);
-	PCMSK0 |= _BV(PCINT4);	//enable interrupt 1 of PCINT
+	PCMSK0 |= _BV(PCINT2);	//enable interrupt 1 of PCINT
 }
 
 
@@ -55,7 +55,8 @@ void enable_pcint_check_interrupt(){
 //}
 
 ISR(PCINT0_vect){
-	switch_relay_sump_pump_on_low_lvl_sensor();
+	switch_relay_sump_pump_on_low_lvl_sensor(level_sensor_low, relay_sump_pump);
+	arduino_led.toggle();
 }
 
 
@@ -69,35 +70,34 @@ bool portb_get_pin(uint8_t pin){
 	return pin_value > samples_num/2;
 }
 
-bool relay_control(RELAY_STATE::state state, uint8_t relay_num){
-	bool pin_value = portb_get_pin(relay_num);
-	if(state == RELAY_STATE::on and pin_value){
-		PORTB &= ~_BV(relay_num);
+bool relay_control(RELAY_STATE::state state, AvrPin relay_pin){
+	if(state == RELAY_STATE::on and relay_pin){
+		relay_pin = PIN::lo;
 		return true;
 	}
-	else if(state == RELAY_STATE::off and not pin_value){
-		PORTB |= _BV(relay_num);
+	else if(state == RELAY_STATE::off and not relay_pin){
+		relay_pin = PIN::hi;
 		return false;
 	}
-	return portb_get_pin(relay_num);
+	return relay_pin;
 }
 
 
 
 
-bool switch_relay_sump_pump_on_low_lvl_sensor(){
+bool switch_relay_sump_pump_on_low_lvl_sensor(AvrPin level_sensor_low, AvrPin relay_sump_pump){
 	/*
 	 * used in ISR
 	 */
 
-	if(not portb_get_pin(LEVEL_SENSOR_LOW)){		//enable relay if level alarm
-		relay_control(RELAY_STATE::on, RELAY_SUMP_PUMP);
+	if(not level_sensor_low){		//enable relay if level alarm
+		relay_control(RELAY_STATE::on, relay_sump_pump);
 		GUARD_COUNTER = 0;
 		return true;
 	}
 	else{
 		if(GUARD_COUNTER>=GUARD_TIME){
-			return relay_control(RELAY_STATE::off, RELAY_SUMP_PUMP);	//disable relay if not level alarm (enable pump)
+			return relay_control(RELAY_STATE::off, relay_sump_pump);	//disable relay if not level alarm (enable pump)
 		}
 	}
 	return false;
@@ -109,17 +109,17 @@ bool enable_sump_pump_after_guard_time(volatile uint16_t& guard_count){
 		guard_count++;
 	}
 	else if(guard_count>=GUARD_TIME){
-		return switch_relay_sump_pump_on_low_lvl_sensor();
+		return switch_relay_sump_pump_on_low_lvl_sensor(level_sensor_low, relay_sump_pump);
 	}
 	return false;
 }
 
-bool monitor_water_change_mode_long_press(){
+bool monitor_water_change_mode_long_press(AvrPin button){
 	/*
 	 * Checks if water change mode button is long pressed
 	 */
 	static uint8_t water_change_mode_trigger_count = 0;
-	if(not (portb_get_pin(BTN))){
+	if(not button){
 		water_change_mode_trigger_count++;
 	}
 	else{
@@ -139,28 +139,26 @@ void update_guard_time_on_wCM(){
 	GUARD_COUNTER = GUARD_TIME;	//reset GUARD_COUNTER
 }
 
-bool monitor_water_change_mode_button(){
+bool monitor_water_change_mode_button(AvrPin ext_diode, AvrPin button){
 	bool state_changed = false;
-	if(monitor_water_change_mode_long_press()){
-//	if(true){
+	if(monitor_water_change_mode_long_press(button)){
 		WATER_CHANGE_MODE ^= true;
-//		WATER_CHANGE_MODE = true;
 		state_changed = true;
 		update_guard_time_on_wCM();
 	}
 
 	if(WATER_CHANGE_MODE){
-		PORTD |= _BV(EXT_DIODE);
+		ext_diode = PIN::hi;
 	}
 	else{
-		PORTD &= ~_BV(EXT_DIODE);
+		ext_diode = PIN::lo;
 	}
 	return state_changed;
 }
 
-void handle_water_change_mode_state(){
+void handle_water_change_mode_state(AvrPin ext_diode, AvrPin button){
 	static uint16_t water_change_mode_counter = 0;
-	if(monitor_water_change_mode_button()){
+	if(monitor_water_change_mode_button(ext_diode, button)){
 		water_change_mode_counter = 0;
 
 	}
@@ -179,12 +177,12 @@ void handle_water_change_mode_state(){
 
 }
 
-void blink_short_and_sleep(){
+void blink_short_and_sleep(AvrPin ext_diode){
 	uint8_t duration = 50;
 	if(not WATER_CHANGE_MODE){
-		PORTD |= _BV(EXT_DIODE);
+		ext_diode = PIN::hi;
 		_delay_ms(duration);
-		PORTD &= ~_BV(EXT_DIODE);
+		ext_diode = PIN::lo;
 		_delay_ms(LOOP_PERIOD - duration);
 	}
 	else{
@@ -192,12 +190,12 @@ void blink_short_and_sleep(){
 	}
 }
 
-void blink_long_and_sleep(){
+void blink_long_and_sleep(AvrPin ext_diode){
 	uint16_t duration = 450;
 	if(not WATER_CHANGE_MODE){
-		PORTD |= _BV(EXT_DIODE);
+		ext_diode = PIN::hi;
 		_delay_ms(duration);
-		PORTD &= ~_BV(EXT_DIODE);
+		ext_diode = PIN::lo;
 		_delay_ms(LOOP_PERIOD - duration);
 	}
 	else{
@@ -206,7 +204,6 @@ void blink_long_and_sleep(){
 }
 
 uint32_t abs(uint32_t a, uint32_t b){
-	//condition ? result_if_true : result_if_false
 	return a > b ? a - b : b -a;
 }
 
@@ -214,29 +211,23 @@ uint32_t loop_seconds(uint32_t loop_count){
 	return loop_count/(1000/LOOP_PERIOD);
 }
 
+
+
 int main(){
-	DDRB &= ~_BV(LEVEL_SENSOR_LOW) & ~_BV(LEVEL_SENSOR_HI) & ~_BV(BTN);		//as input
-	PORTB |= _BV(LEVEL_SENSOR_LOW) | _BV(LEVEL_SENSOR_HI) | _BV(BTN);		//pull up
-	DDRB |= _BV(RELAY_SUMP_PUMP)
-			| _BV(RELAY_FEED_PUMP) | _BV(ARDUINO_LED);		//as output
-
-	DDRD |= _BV(EXT_DIODE) | _BV(OC0A);
-
+	level_sensor_low = PIN::hi;
+	out_compare_0A = PIN::lo;
 	enable_pcint_check_interrupt();
-	relay_control(RELAY_STATE::off, RELAY_SUMP_PUMP);
-	relay_control(RELAY_STATE::off, RELAY_FEED_PUMP);
+	relay_control(RELAY_STATE::off, relay_sump_pump);
+	relay_control(RELAY_STATE::off, relay_feed_pump);
 	_delay_ms(500);
 	GUARD_COUNTER=GUARD_TIME;
-	switch_relay_sump_pump_on_low_lvl_sensor();
+	switch_relay_sump_pump_on_low_lvl_sensor(level_sensor_low, relay_sump_pump);
 	sei();
 	uint32_t loop_count=0;
 	bool pump_was_started = false;
 	uint32_t sump_pump_start_tstamp = 0;
 	uint32_t feed_pump_start_tstamp = 0;
 
-
-//	PORTD |= _BV(OC0A);
-	PORTD &= ~_BV(OC0A);
 	uint8_t fan_speed = 100;
 	set_fast_pwm_timer0(fan_speed);
 	while(true){
@@ -254,14 +245,13 @@ int main(){
 				sump_pump_start_tstamp = 0;
 			}
 
-			handle_water_change_mode_state();
+			handle_water_change_mode_state(ext_diode, button);
 			if(GUARD_COUNTER>=GUARD_TIME){
-				blink_short_and_sleep();
+				blink_short_and_sleep(ext_diode);
 			}
 			else{
-				blink_long_and_sleep();
+				blink_long_and_sleep(ext_diode);
 			}
-			PORTB ^= _BV(ARDUINO_LED);
 		}
 		else{
 			_delay_ms(LOOP_PERIOD);
@@ -271,26 +261,26 @@ int main(){
 
 
 		if(WATER_CHANGE_MODE){
-			if(portb_get_pin(LEVEL_SENSOR_HI)){
-				relay_control(RELAY_STATE::on, RELAY_FEED_PUMP);
+			if(level_sensor_hi){
+				relay_control(RELAY_STATE::on, relay_feed_pump);
 				feed_pump_start_tstamp = loop_seconds(loop_count);
 			}
 
 			else{
 				if(( abs( sump_pump_start_tstamp, feed_pump_start_tstamp) < 5)){
 					if( sump_pump_start_tstamp and abs( loop_seconds(loop_count), sump_pump_start_tstamp) > 30){
-						relay_control(RELAY_STATE::off, RELAY_FEED_PUMP);
+						relay_control(RELAY_STATE::off, relay_feed_pump);
 						feed_pump_start_tstamp = 0;
 					}
 				}
 				else{
-					relay_control(RELAY_STATE::off, RELAY_FEED_PUMP);
+					relay_control(RELAY_STATE::off, relay_feed_pump);
 					feed_pump_start_tstamp = 0;
 				}
 			}
 		}
 		else{
-			relay_control(RELAY_STATE::off, RELAY_FEED_PUMP);
+			relay_control(RELAY_STATE::off, relay_feed_pump);
 			feed_pump_start_tstamp = 0;
 		}
 		loop_count++;
