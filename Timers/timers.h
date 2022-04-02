@@ -5,10 +5,12 @@
  *      Author: rafal
  */
 
-#ifndef TIMER1_TIMER1_H_
-#define TIMER1_TIMER1_H_
+#ifndef TIMERS_TIMERS_H_
+#define TIMERS_TIMERS_H_
 
 #include <avr/io.h>
+#include <avr/interrupt.h>
+#include <math.h>
 
 typedef volatile uint8_t& reg8b_ref;
 typedef void (*void_void_fptr)(void);
@@ -111,8 +113,75 @@ void compa_int_delay(uint16_t seconds);
 void compa_int_delay_s(uint16_t seconds, tccrb_reg& tccrb, volatile uint16_t* ocr);
 
 
+//uint32_t cycles_to_ms(uint32_t cycles, uint16_t _prescaler);
+//uint32_t cycles_to_ms(uint64_t cycles, uint16_t _prescaler);
+
+template<typename CyType>
+uint32_t cycles_to_ms(CyType cycles, uint16_t _prescaler){
+	uint32_t f_cpu = (F_CPU/_prescaler)/1000;
+	return cycles/f_cpu;
+}
+
+
+class Timer;
+
+class TimeStamp{
+private:
+	uint16_t tic;
+	Timer* timer;
+public:
+	TimeStamp(Timer* timer);
+	uint16_t toc();
+};
+
+
 class Timer{
+protected:
+	TccrbClockSelect::pre prescaler;
+	timsk_reg& timsk;
+	tccra_reg& tccra;
+	tccrb_reg& tccrb;
+	uint16_t& tcnt;
+	uint16_t toi_count=0;
+
+public:
+	Timer(TccrbClockSelect::pre prescaler, timsk_reg& timsk, tccra_reg& tccra, tccrb_reg& tccrb, uint16_t& tcnt):
+		prescaler(prescaler), timsk(timsk), tccra(tccra), tccrb(tccrb), tcnt(tcnt){
+		//constructor here
+	};
+	Timer(Timer* timer): prescaler(timer->prescaler), timsk(timer->timsk), tccra(timer->tccra), tccrb(timer->tccrb), tcnt(timer->tcnt){};
+	void toi_count_kick(){
+		toi_count++;
+	}
+
+	uint16_t toi_count_get(){
+		return toi_count;
+	}
+
+	uint32_t get_ms(){
+		return cycles_to_ms<uint16_t>(toi_count*65535, 1);
+	}
+	TimeStamp tic(){
+		return TimeStamp(this);
+	}
+
+	Timer& operator=(Timer& _me){
+		return _me;
+	}
+
+	uint32_t max_range_ms(){
+		uint32_t v = pow(2, sizeof(toi_count)*8) * pow(2, sizeof(uint16_t)*8);
+		return cycles_to_ms<uint64_t>(v, prescaler);
+	}
+};
+
+
+
+class Timer1: public Timer{
+public:
+	static uint16_t* toi_count_ptr;
+	Timer1(TccrbClockSelect::pre = TccrbClockSelect::pre1);
 
 };
 
-#endif /* TIMER1_TIMER1_H_ */
+#endif /* TIMERS_TIMERS_H_ */

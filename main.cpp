@@ -9,17 +9,12 @@
 #include <util/delay.h>
 #include <avr/io.h>
 #include <avr/interrupt.h>
-#include "Timer1/timer1.h"
+#include <stdio.h>
 #include "avr_ports/avr_ports.h"
 #include "atm328_usart/usart.h"
+#include "setup.h"
+#include "Timers/timers.h"
 
-
-
-
-#define LOOP_PERIOD			500		//cant exceed 1000
-#define GUARD_TIME_WCM		0		//water change mode
-#define WATER_CHANGE_MODE_DURATION	(60*60)
-#define GUARD_TIME_NWCM		(5*60)	//not water change mode
 
 
 #if LOOP_PERIOD > 1000
@@ -40,6 +35,7 @@ Usart usart(usart0, 9600, 20, 20);
 volatile uint16_t GUARD_COUNTER=0;
 volatile bool WATER_CHANGE_MODE = false;
 volatile uint16_t GUARD_TIME = GUARD_TIME_NWCM;
+
 
 bool switch_relay_sump_pump_on_low_lvl_sensor(AvrPin level_sensor_low, AvrPin relay_sump_pump);
 
@@ -233,13 +229,34 @@ void setup_stdout_for_printf(){
 /****************************************************************/
 
 
+int printfp(const char* format, ...){
+	/*
+	 * Uses formated print to attach pgmspace string to message
+	 */
+	if(strlen_P(format) <70){
+		char buff[50];
+		va_list arg;
+		int done;
+		va_start (arg, format);
+		done = vsprintf_P(buff, format, arg);
+		va_end (arg);
+		printf(buff);
+		return done;
+	}
+	return 0;
+}
+
+
 int main(){
+
 	setup_stdout_for_printf();
 	level_sensor_low = PIN::hi;
 	out_compare_0A = PIN::lo;
 	enable_pcint_check_interrupt();
 	relay_control(RELAY_STATE::off, relay_sump_pump);
 	relay_control(RELAY_STATE::off, relay_feed_pump);
+	Timer1 timer1(TccrbClockSelect::pre1);
+	Timer1 tref = timer1;
 	_delay_ms(500);
 	GUARD_COUNTER=GUARD_TIME;
 	switch_relay_sump_pump_on_low_lvl_sensor(level_sensor_low, relay_sump_pump);
@@ -251,6 +268,7 @@ int main(){
 
 	uint8_t fan_speed = 100;
 	set_fast_pwm_timer0(fan_speed);
+	timer1.tic();
 	while(true){
 		if(not( loop_count % (500/LOOP_PERIOD))){
 			set_fast_pwm_timer0(fan_speed);
@@ -274,7 +292,8 @@ int main(){
 				blink_long_and_sleep(ext_diode);
 			}
 			arduino_led.toggle();
-			printf("hello\n");
+			printf("%lu\n", timer1.max_range_ms());
+//			printf("%u\n", tref.toc());
 		}
 		else{
 			_delay_ms(LOOP_PERIOD);

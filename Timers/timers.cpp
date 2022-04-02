@@ -5,7 +5,8 @@
  *      Author: rafal
  */
 
-#include "timer1.h"
+#include "timers.h"
+
 #include <avr/interrupt.h>
 
 void null_func(void) {
@@ -98,7 +99,35 @@ void set_fast_pwm_timer0(uint8_t pwm){
 	}
 }
 
+/////////////////////////////////////////////////////////////////////////////////
 
 
+
+ISR(TIMER1_OVF_vect){
+	(*Timer1::toi_count_ptr)++;
+}
+
+
+uint16_t* Timer1::toi_count_ptr = 0;
+
+Timer1::Timer1(TccrbClockSelect::pre prescaler):
+		Timer(prescaler, (timsk_reg&)TIMSK1, (tccra_reg&)TCCR1A, (tccrb_reg&)TCCR1B, (uint16_t&)TCNT1)
+{
+	tccrb.cs = prescaler;
+	timsk.toie = true;
+	toi_count_ptr = &toi_count;
+}
+
+
+TimeStamp::TimeStamp(Timer* timer):timer(timer){
+	tic = timer->get_ms();
+}
+
+uint16_t TimeStamp::toc(){
+	uint16_t now = timer->get_ms();
+	uint16_t toc = now - tic;
+	tic = timer->get_ms();
+	return toc;
+}
 
 
