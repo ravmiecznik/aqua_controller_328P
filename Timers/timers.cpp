@@ -116,31 +116,31 @@ void set_fast_pwm_timer0(uint8_t pwm){
 
 uint32_t Timer::max_range_ms(){
 	uint64_t v = pow(2, sizeof(toi_count)*8) * pow(2, sizeof(uint16_t)*8);
-	return cycles_to_ms<uint64_t>(v, prescaler_raw);
+	return cycles_to_ms<uint64_t>(v, get_prescaler());
 }
 uint32_t Timer::max_range_sec(){
 	uint64_t v = pow(2, sizeof(toi_count)*8) * pow(2, sizeof(uint16_t)*8);
-	return cycles_to_sec(v, prescaler_raw);
+	return cycles_to_sec(v, get_prescaler());
 }
 
 uint32_t Timer::max_range_min(){
 	uint64_t v = pow(2, sizeof(toi_count)*8) * pow(2, sizeof(uint16_t)*8);
-	return cycles_to_min(v, prescaler_raw);
+	return cycles_to_min(v, get_prescaler());
 }
 
 uint32_t Timer::max_range_hours(){
 	uint64_t v = pow(2, sizeof(toi_count)*8) * pow(2, sizeof(uint16_t)*8);
-	return cycles_to_hour(v, prescaler_raw);
+	return cycles_to_hour(v, get_prescaler());
 }
 
 uint32_t Timer::max_range_days(){
 	uint64_t v = pow(2, sizeof(toi_count)*8) * pow(2, sizeof(uint16_t)*8);
-	return cycles_to_days(v, prescaler_raw);
+	return cycles_to_days(v, get_prescaler());
 }
 
 Timer::TimeStamp Timer::max_range(){
 	uint64_t max_cycles = pow(2, sizeof(toi_count)*8) * pow(2, sizeof(uint16_t)*8);
-	uint32_t seconds = cycles_to_sec(max_cycles, prescaler_raw);
+	uint32_t seconds = cycles_to_sec(max_cycles, get_prescaler());
 	uint32_t minutes = seconds/60;
 	uint32_t hours = minutes/60;
 	uint32_t days = hours/24;
@@ -165,7 +165,7 @@ ISR(TIMER1_OVF_vect){
 }
 
 
-uint32_t* Timer1::toi_count_ptr = 0;
+uint16_t* Timer1::toi_count_ptr = 0;
 
 Timer1::Timer1(TccrbClockSelect::pre prescaler):
 		TimerT<uint16_t>(prescaler, (timsk_reg&)TIMSK1, (tccra_reg&)TCCR1A, (tccrb_reg&)TCCR1B, (uint16_t&)TCNT1)
@@ -173,6 +173,14 @@ Timer1::Timer1(TccrbClockSelect::pre prescaler):
 	tccrb.cs = prescaler;
 	timsk.toie = true;
 	toi_count_ptr = &toi_count;
+}
+
+Timer1::Timer1(const Timer1& source):
+		TimerT<uint16_t>(source.prescaler, source.timsk, source.tccra, source.tccrb, source.tcnt)
+{
+	tccrb.cs = source.prescaler;
+	timsk.toie = source.timsk.toie;
+	toi_count_ptr = source.toi_count_ptr;
 }
 
 

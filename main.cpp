@@ -256,8 +256,8 @@ int main(){
 	enable_pcint_check_interrupt();
 	relay_control(RELAY_STATE::off, relay_sump_pump);
 	relay_control(RELAY_STATE::off, relay_feed_pump);
-	Timer1 timer1(TccrbClockSelect::pre1);
-	_delay_ms(500);
+	Timer1 timer1(TccrbClockSelect::pre1024);
+//	_delay_ms(500);
 	GUARD_COUNTER=GUARD_TIME;
 	switch_relay_sump_pump_on_low_lvl_sensor(level_sensor_low, relay_sump_pump);
 	sei();
@@ -267,8 +267,8 @@ int main(){
 	uint32_t feed_pump_start_tstamp = 0;
 
 	uint8_t fan_speed = 100;
-	set_fast_pwm_timer0(fan_speed);
-	timer1.tic();
+//	set_fast_pwm_timer0(fan_speed);
+
 	while(true){
 		if(not( loop_count % (500/LOOP_PERIOD))){
 			set_fast_pwm_timer0(fan_speed);
@@ -293,15 +293,13 @@ int main(){
 			}
 			arduino_led.toggle();
 			Timer::TimeStamp TS = timer1.max_range();
+			printf("pre: %u\n", timer1.get_prescaler());
 			printfp(timer_range_fmt, TS.days, TS.hours, TS.minutes, TS.seconds);
-//			printf("%u\n", timer1.max_range_min());
-//			printf("%u\n", tref.toc());
 		}
 		else{
 			_delay_ms(LOOP_PERIOD);
 
 		}
-
 
 
 

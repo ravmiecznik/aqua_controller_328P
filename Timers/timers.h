@@ -11,6 +11,7 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include <math.h>
+#include <stdio.h>
 
 typedef volatile uint8_t& reg8b_ref;
 typedef void (*void_void_fptr)(void);
@@ -186,8 +187,7 @@ protected:
 	timsk_reg& timsk;
 	tccra_reg& tccra;
 	tccrb_reg& tccrb;
-	uint32_t toi_count=0;
-	uint16_t prescaler_raw;
+	uint16_t toi_count=0;
 
 public:
 
@@ -200,9 +200,13 @@ public:
 
 	Timer(TccrbClockSelect::pre prescaler, timsk_reg& timsk, tccra_reg& tccra, tccrb_reg& tccrb):
 		prescaler(prescaler), timsk(timsk), tccra(tccra), tccrb(tccrb){
-		//TODO: FIX THIS !!! prescaler must be a integer value
-		prescaler_raw = 1;
 	};
+
+	Timer(const Timer& source):
+		prescaler(source.prescaler), timsk(source.timsk), tccra(source.tccra), tccrb(source.tccrb){
+	};
+
+
 	void toi_count_kick(){
 		toi_count++;
 	}
@@ -214,12 +218,13 @@ public:
 	uint32_t get_ms(){
 		return cycles_to_ms<uint16_t>(toi_count*65535, 1);
 	}
-	TimeCount tic(){
-		return TimeCount(this);
+
+	int16_t get_prescaler(){
+		return get_prescaler_value(tccrb);
 	}
 
-	Timer& operator=(Timer& _me){
-		return _me;
+	TimeCount tic(){
+		return TimeCount(this);
 	}
 
 	uint32_t max_range_ms();
@@ -236,10 +241,14 @@ class TimerT: public Timer{
 	/*
 	 * Specify timer8 or timer16
 	 */
+protected:
 	TType& tcnt;
 public:
 	TimerT(TccrbClockSelect::pre prescaler, timsk_reg& timsk, tccra_reg& tccra, tccrb_reg& tccrb, TType& _tcnt):
 		Timer(prescaler, timsk, tccra, tccrb), tcnt(_tcnt){};
+	TimerT(const TimerT& source):
+		Timer(source.prescaler, source.timsk, source.tccra, source.tccrb), tcnt(source.tcnt){
+	};
 };
 
 
@@ -248,9 +257,9 @@ class Timer1: public TimerT<uint16_t>{
 	 * 16bit Timer1
 	 */
 public:
-	static uint32_t* toi_count_ptr;
+	static uint16_t* toi_count_ptr;
 	Timer1(TccrbClockSelect::pre = TccrbClockSelect::pre1);
-
+	Timer1(const Timer1& source);
 };
 
 #endif /* TIMERS_TIMERS_H_ */
