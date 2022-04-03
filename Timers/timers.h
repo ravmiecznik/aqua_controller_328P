@@ -113,43 +113,79 @@ void compa_int_delay(uint16_t seconds);
 void compa_int_delay_s(uint16_t seconds, tccrb_reg& tccrb, volatile uint16_t* ocr);
 
 
-//uint32_t cycles_to_ms(uint32_t cycles, uint16_t _prescaler);
-//uint32_t cycles_to_ms(uint64_t cycles, uint16_t _prescaler);
-
-template<typename CyType>
-uint32_t cycles_to_ms(CyType cycles, uint16_t _prescaler){
-	uint32_t f_cpu = (F_CPU/_prescaler)/1000;
+template<typename CyType, typename RetType=uint32_t>
+RetType cycles_to_ms(CyType cycles, uint16_t _prescaler){
+	RetType f_cpu = (F_CPU/_prescaler)/1000;
 	return cycles/f_cpu;
+	if(_prescaler < 256){
+		return cycles/f_cpu;
+	}
+	else{
+		f_cpu = F_CPU/1000;
+		return _prescaler*cycles/f_cpu;
+	}
 }
 
 
+template<typename CyType>
+uint32_t cycles_to_sec(CyType cycles, uint16_t _prescaler){
+	return cycles_to_ms<CyType, uint64_t>(cycles, _prescaler)/1000;
+}
+
+template<typename CyType>
+uint32_t cycles_to_min(CyType cycles, uint16_t _prescaler){
+	return cycles_to_sec<CyType>(cycles, _prescaler)/60;
+}
+
+template<typename CyType>
+uint32_t cycles_to_hour(CyType cycles, uint16_t _prescaler){
+	return cycles_to_min<CyType>(cycles, _prescaler)/60;
+}
+
+template<typename CyType>
+uint32_t cycles_to_days(CyType cycles, uint16_t _prescaler){
+	return cycles_to_hour<CyType>(cycles, _prescaler)/24;
+}
+
+uint16_t get_prescaler_value(tccrb_reg &tccrb);
+
 class Timer;
 
-class TimeStamp{
+class TimeCount{
 private:
 	uint16_t tic;
 	Timer* timer;
 public:
-	TimeStamp(Timer* timer);
+	TimeCount(Timer* timer);
 	uint16_t toc();
 };
 
-
 class Timer{
+	/*
+	 * Prototype class for both timer 8 and 16
+	 */
 protected:
 	TccrbClockSelect::pre prescaler;
 	timsk_reg& timsk;
 	tccra_reg& tccra;
 	tccrb_reg& tccrb;
-	uint16_t& tcnt;
-	uint16_t toi_count=0;
+	uint32_t toi_count=0;
+	uint16_t prescaler_raw;
 
 public:
-	Timer(TccrbClockSelect::pre prescaler, timsk_reg& timsk, tccra_reg& tccra, tccrb_reg& tccrb, uint16_t& tcnt):
-		prescaler(prescaler), timsk(timsk), tccra(tccra), tccrb(tccrb), tcnt(tcnt){
-		//constructor here
+
+	struct TimeStamp{
+		uint16_t days;
+		uint8_t hours;
+		uint8_t minutes;
+		uint8_t seconds;
 	};
-	Timer(Timer* timer): prescaler(timer->prescaler), timsk(timer->timsk), tccra(timer->tccra), tccrb(timer->tccrb), tcnt(timer->tcnt){};
+
+	Timer(TccrbClockSelect::pre prescaler, timsk_reg& timsk, tccra_reg& tccra, tccrb_reg& tccrb):
+		prescaler(prescaler), timsk(timsk), tccra(tccra), tccrb(tccrb){
+		//TODO: FIX THIS !!! prescaler must be a integer value
+		prescaler_raw = 1;
+	};
 	void toi_count_kick(){
 		toi_count++;
 	}
@@ -161,25 +197,39 @@ public:
 	uint32_t get_ms(){
 		return cycles_to_ms<uint16_t>(toi_count*65535, 1);
 	}
-	TimeStamp tic(){
-		return TimeStamp(this);
+	TimeCount tic(){
+		return TimeCount(this);
 	}
 
 	Timer& operator=(Timer& _me){
 		return _me;
 	}
 
-	uint32_t max_range_ms(){
-		uint32_t v = pow(2, sizeof(toi_count)*8) * pow(2, sizeof(uint16_t)*8);
-		return cycles_to_ms<uint64_t>(v, prescaler);
-	}
+	uint32_t max_range_ms();
+	uint32_t max_range_sec();
+	uint32_t max_range_min();
+	uint32_t max_range_hours();
+	uint32_t max_range_days();
+	TimeStamp max_range();
+};
+
+
+template<typename TType>
+class TimerT: public Timer{
+	/*
+	 * Specify timer8 or timer16
+	 */
+	TType& tcnt;
+public:
+	TimerT(TccrbClockSelect::pre prescaler, timsk_reg& timsk, tccra_reg& tccra, tccrb_reg& tccrb, TType& _tcnt):
+		Timer(prescaler, timsk, tccra, tccrb), tcnt(_tcnt){};
 };
 
 
 
-class Timer1: public Timer{
+class Timer1: public TimerT<uint16_t>{
 public:
-	static uint16_t* toi_count_ptr;
+	static uint32_t* toi_count_ptr;
 	Timer1(TccrbClockSelect::pre = TccrbClockSelect::pre1);
 
 };

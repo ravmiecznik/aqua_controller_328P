@@ -13,6 +13,7 @@
 #include "avr_ports/avr_ports.h"
 #include "atm328_usart/usart.h"
 #include "setup.h"
+#include "pgm_data.h"
 #include "Timers/timers.h"
 
 
@@ -256,7 +257,6 @@ int main(){
 	relay_control(RELAY_STATE::off, relay_sump_pump);
 	relay_control(RELAY_STATE::off, relay_feed_pump);
 	Timer1 timer1(TccrbClockSelect::pre1);
-	Timer1 tref = timer1;
 	_delay_ms(500);
 	GUARD_COUNTER=GUARD_TIME;
 	switch_relay_sump_pump_on_low_lvl_sensor(level_sensor_low, relay_sump_pump);
@@ -292,7 +292,9 @@ int main(){
 				blink_long_and_sleep(ext_diode);
 			}
 			arduino_led.toggle();
-			printf("%lu\n", timer1.max_range_ms());
+			Timer::TimeStamp TS = timer1.max_range();
+			printfp(timer_range_fmt, TS.days, TS.hours, TS.minutes, TS.seconds);
+//			printf("%u\n", timer1.max_range_min());
 //			printf("%u\n", tref.toc());
 		}
 		else{

@@ -6,7 +6,7 @@
  */
 
 #include "timers.h"
-
+#include "../pgm_data.h"
 #include <avr/interrupt.h>
 
 void null_func(void) {
@@ -99,8 +99,50 @@ void set_fast_pwm_timer0(uint8_t pwm){
 	}
 }
 
-/////////////////////////////////////////////////////////////////////////////////
 
+
+/// TIMER PROTOTYPE/////////////////////////////////////////////////////////////
+
+uint32_t Timer::max_range_ms(){
+	uint64_t v = pow(2, sizeof(toi_count)*8) * pow(2, sizeof(uint16_t)*8);
+	return cycles_to_ms<uint64_t>(v, prescaler_raw);
+}
+uint32_t Timer::max_range_sec(){
+	uint64_t v = pow(2, sizeof(toi_count)*8) * pow(2, sizeof(uint16_t)*8);
+	return cycles_to_sec(v, prescaler_raw);
+}
+
+uint32_t Timer::max_range_min(){
+	uint64_t v = pow(2, sizeof(toi_count)*8) * pow(2, sizeof(uint16_t)*8);
+	return cycles_to_min(v, prescaler_raw);
+}
+
+uint32_t Timer::max_range_hours(){
+	uint64_t v = pow(2, sizeof(toi_count)*8) * pow(2, sizeof(uint16_t)*8);
+	return cycles_to_hour(v, prescaler_raw);
+}
+
+uint32_t Timer::max_range_days(){
+	uint64_t v = pow(2, sizeof(toi_count)*8) * pow(2, sizeof(uint16_t)*8);
+	return cycles_to_days(v, prescaler_raw);
+}
+
+Timer::TimeStamp Timer::max_range(){
+	uint64_t max_cycles = pow(2, sizeof(toi_count)*8) * pow(2, sizeof(uint16_t)*8);
+	uint32_t seconds = cycles_to_sec(max_cycles, prescaler_raw);
+	uint32_t minutes = seconds/60;
+	uint32_t hours = minutes/60;
+	uint32_t days = hours/24;
+	TimeStamp TS;
+	TS.days = days;
+	TS.hours = hours - 24*days;
+	TS.minutes = minutes - 60*hours;
+	TS.seconds = seconds - 60*minutes;
+
+	return TS;
+}
+
+/// TIMER1 //////////////////////////////////////////////////////////////////////
 
 
 ISR(TIMER1_OVF_vect){
@@ -108,10 +150,10 @@ ISR(TIMER1_OVF_vect){
 }
 
 
-uint16_t* Timer1::toi_count_ptr = 0;
+uint32_t* Timer1::toi_count_ptr = 0;
 
 Timer1::Timer1(TccrbClockSelect::pre prescaler):
-		Timer(prescaler, (timsk_reg&)TIMSK1, (tccra_reg&)TCCR1A, (tccrb_reg&)TCCR1B, (uint16_t&)TCNT1)
+		TimerT<uint16_t>(prescaler, (timsk_reg&)TIMSK1, (tccra_reg&)TCCR1A, (tccrb_reg&)TCCR1B, (uint16_t&)TCNT1)
 {
 	tccrb.cs = prescaler;
 	timsk.toie = true;
@@ -119,11 +161,11 @@ Timer1::Timer1(TccrbClockSelect::pre prescaler):
 }
 
 
-TimeStamp::TimeStamp(Timer* timer):timer(timer){
+TimeCount::TimeCount(Timer* timer):timer(timer){
 	tic = timer->get_ms();
 }
 
-uint16_t TimeStamp::toc(){
+uint16_t TimeCount::toc(){
 	uint16_t now = timer->get_ms();
 	uint16_t toc = now - tic;
 	tic = timer->get_ms();
