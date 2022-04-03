@@ -18,6 +18,10 @@ void register_timer1_compa_func(void_void_fptr func);
 void set_fast_pwm_timer0(uint8_t pwm);
 
 
+//**********************************************************//
+//    TIMER REGISTERS                                       //
+//**********************************************************//
+
 
 /*
  * INTERRUPT MASK REGISTER
@@ -31,8 +35,6 @@ struct timsk_reg{
 			bool ociea			:1;
 			bool ocieb			:1;
 			uint8_t reserved	:3;
-//			bool icie			:1;
-//			uint8_t reserved_2	:2;
 		};
 	};
 };
@@ -85,7 +87,7 @@ namespace WaveFormGenerationMode {
 	enum mod {
 		normal,
 		pwm_phase_correct,
-		ctc_ocra, //clear timer on compare
+		ctc_ocra, 					//clear timer on compare
 		fast_pwm,
 		reserved,
 		pwm_phase_correct2,
@@ -105,6 +107,12 @@ struct waveform_generation_mode_bit_selection {
 		};
 	};
 };
+
+
+
+//**********************************************************//
+//    AUXILIARY FUNCTIONS                                   //
+//**********************************************************//
 
 
 void setup_timer_ociea(tccrb_reg& tccrb, timsk_reg& timsk, TccrbClockSelect::pre clock_select);
@@ -149,8 +157,17 @@ uint32_t cycles_to_days(CyType cycles, uint16_t _prescaler){
 
 uint16_t get_prescaler_value(tccrb_reg &tccrb);
 
-class Timer;
 
+
+//**********************************************************//
+//    TIMER CLASSES                                         //
+//**********************************************************//
+
+
+class Timer;
+/*
+ * A root prototype for all timers-> 16bit or 8bit
+ */
 class TimeCount{
 private:
 	uint16_t tic;
@@ -226,8 +243,10 @@ public:
 };
 
 
-
 class Timer1: public TimerT<uint16_t>{
+	/*
+	 * 16bit Timer1
+	 */
 public:
 	static uint32_t* toi_count_ptr;
 	Timer1(TccrbClockSelect::pre = TccrbClockSelect::pre1);

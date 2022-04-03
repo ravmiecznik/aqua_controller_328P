@@ -9,12 +9,19 @@
 #include "../pgm_data.h"
 #include <avr/interrupt.h>
 
+
+
+
+//**********************************************************//
+//    AUXILIARY FUNCTIONS                                   //
+//**********************************************************//
+
+
 void null_func(void) {
 
 }
 
-
-void_void_fptr timer1_compa_func = &null_func;
+void_void_fptr timer1_compa_func = &null_func;	//safely point a pointer function to null function
 volatile uint16_t _delay_counter_comp1a = 0;
 
 ISR(TIMER1_COMPA_vect){
@@ -29,9 +36,6 @@ ISR(TIMER1_COMPA_vect){
 	}
 }
 
-//ISR(TIMER0_COMPA_vect){
-//	PORTB ^= _BV(PB5);
-//}
 
 void register_timer1_compa_func(void_void_fptr func){
 	timer1_compa_func = func;
@@ -82,6 +86,9 @@ void compa_int_delay_s(uint16_t seconds, tccrb_reg& tccrb, volatile uint16_t* oc
 }
 
 void set_fast_pwm_timer0(uint8_t pwm){
+	/*
+	 * Will be removed
+	 */
 	((tccra_reg&)TCCR0A).com_a_1 = 0;
 	((tccra_reg&)TCCR0A).wgm_0 = 0;
 	((tccra_reg&)TCCR0A).wgm_1 = 0;
@@ -101,7 +108,11 @@ void set_fast_pwm_timer0(uint8_t pwm){
 
 
 
-/// TIMER PROTOTYPE/////////////////////////////////////////////////////////////
+
+//**********************************************************//
+//    TIMER PROTOTYPE                                       //
+//**********************************************************//
+
 
 uint32_t Timer::max_range_ms(){
 	uint64_t v = pow(2, sizeof(toi_count)*8) * pow(2, sizeof(uint16_t)*8);
@@ -142,7 +153,11 @@ Timer::TimeStamp Timer::max_range(){
 	return TS;
 }
 
-/// TIMER1 //////////////////////////////////////////////////////////////////////
+
+
+//**********************************************************//
+//    TIMER1                                                //
+//**********************************************************//
 
 
 ISR(TIMER1_OVF_vect){
