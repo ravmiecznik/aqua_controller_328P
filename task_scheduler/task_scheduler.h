@@ -44,6 +44,9 @@
 
 template<typename ArrType>
 ArrType* sort(ArrType* array, uint32_t start, uint32_t end){
+	/*
+	 * Sort an array from start to end index
+	 */
 	ArrType temp;
 	for(uint32_t i = start; i<end; i++)
 	{
@@ -148,8 +151,6 @@ template<typename TaskType, class Timer>
 class Tasks: public SortedStack<TaskType>
 /*
  * Manage task list
- * TODO: sort tasks according to time stamp
- * TODO: remove executed tasks from list (use other list of pointers + some sort of stack ?)
  */
 {
 private:
@@ -168,6 +169,9 @@ public:
 	}
 
 	void check(){
+		/*
+		 * Run task according to its time stamp
+		 */
 		TaskType task = SortedStack<TaskType>::peek();
 		if(timer.get_timestamp_s() >= task.tstamp.to_seconds()){
 			task = SortedStack<TaskType>::get();
