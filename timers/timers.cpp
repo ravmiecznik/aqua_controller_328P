@@ -5,11 +5,13 @@
  *      Author: rafal
  */
 
-#include "timers.h"
+#include "../timers/timers.h"
+
 #include "../pgm_data.h"
 #include <avr/interrupt.h>
+#include "../setup.h"
 
-
+extern char* STR_BUFFER;
 
 
 //**********************************************************//
@@ -108,15 +110,59 @@ void set_fast_pwm_timer0(uint8_t pwm){
 
 
 
+//**********************************************************//
+//    TIMESTAMP                                             //
+//**********************************************************//
+
+TimeStamp::TimeStamp(uint32_t raw_time_s){
+	/*
+	 * Init from raw seconds
+	 */
+	init_from_seconds(raw_time_s);
+}
+
+void TimeStamp::init_from_seconds(uint32_t raw_time_s){
+	second = raw_time_s % 60;
+	raw_time_s /= 60;
+	minute = raw_time_s % 60;
+	raw_time_s /= 60;
+	hour = raw_time_s % 24;
+	raw_time_s /= 24;
+	day = raw_time_s;
+}
+
+uint32_t TimeStamp::to_seconds(){
+	uint32_t total_seconds = (uint32_t)second + (uint32_t)minute*60 + (uint32_t)hour*60*60 + (uint32_t)day*24*60*60;
+	return total_seconds;
+}
+
+void TimeStamp::normalize(uint32_t max_value){
+	init_from_seconds(to_seconds() - max_value);
+	printf("normalized\n%s",(const char*)*this);
+}
+
+TimeStamp::operator const char*(){
+	uint16_t p = 0;
+	p += sprintf_P(TimeStamp::buffer, 	  TIMESTAMP_S);
+	p += sprintf_P(&TimeStamp::buffer[p], TIMESTAMP_DAY_S, day);
+	p += sprintf_P(&TimeStamp::buffer[p], TIMESTAMP_HOUR_S, hour);
+	p += sprintf_P(&TimeStamp::buffer[p], TIMESTAMP_MINUTE_S, minute);
+	p += sprintf_P(&TimeStamp::buffer[p], TIMESTAMP_SECOND_S, second);
+	return TimeStamp::buffer;
+}
+
+char* TimeStamp::buffer = STR_BUFFER;
+
 
 //**********************************************************//
 //    TIMER PROTOTYPE                                       //
 //**********************************************************//
 
+bool Timer::timer_type = true;
 
 uint32_t Timer::max_range_ms(){
 	uint64_t v = pow(2, sizeof(toi_count)*8) * pow(2, sizeof(uint16_t)*8);
-	return cycles_to_ms<uint64_t>(v, get_prescaler());
+	return cycles_to_ms<uint64_t>(v, get_prescaler()); // @suppress("Symbol is not resolved") // @suppress("Invalid arguments")
 }
 uint32_t Timer::max_range_sec(){
 	uint64_t v = pow(2, sizeof(toi_count)*8) * pow(2, sizeof(uint16_t)*8);
@@ -138,19 +184,24 @@ uint32_t Timer::max_range_days(){
 	return cycles_to_days(v, get_prescaler());
 }
 
-Timer::TimeStamp Timer::max_range(){
+
+TimeStamp Timer::max_range(){
 	uint64_t max_cycles = pow(2, sizeof(toi_count)*8) * pow(2, sizeof(uint16_t)*8);
 	uint32_t seconds = cycles_to_sec(max_cycles, get_prescaler());
 	uint32_t minutes = seconds/60;
 	uint32_t hours = minutes/60;
 	uint32_t days = hours/24;
 	TimeStamp TS;
-	TS.days = days;
-	TS.hours = hours - 24*days;
-	TS.minutes = minutes - 60*hours;
-	TS.seconds = seconds - 60*minutes;
+	TS.day = days;
+	TS.hour = hours - 24*days;
+	TS.minute = minutes - 60*hours;
+	TS.second = seconds - 60*minutes;
 
 	return TS;
+}
+
+TimeStamp Timer::now(){
+	return TimeStamp(get_ms()/1000);
 }
 
 
@@ -165,7 +216,7 @@ ISR(TIMER1_OVF_vect){
 }
 
 
-uint16_t* Timer1::toi_count_ptr = 0;
+volatile uint16_t* Timer1::toi_count_ptr = 0;
 
 Timer1::Timer1(TccrbClockSelect::pre prescaler):
 		TimerT<uint16_t>(prescaler, (timsk_reg&)TIMSK1, (tccra_reg&)TCCR1A, (tccrb_reg&)TCCR1B, (uint16_t&)TCNT1)
@@ -173,6 +224,8 @@ Timer1::Timer1(TccrbClockSelect::pre prescaler):
 	tccrb.cs = prescaler;
 	timsk.toie = true;
 	toi_count_ptr = &toi_count;
+
+	toi_count = 0xff00;
 }
 
 Timer1::Timer1(const Timer1& source):

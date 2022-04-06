@@ -13,10 +13,14 @@
 #include <math.h>
 #include <stdio.h>
 
+#define __ASSERT_USE_STDERR
+#include <assert.h>
+
 typedef volatile uint8_t& reg8b_ref;
 typedef void (*void_void_fptr)(void);
 void register_timer1_compa_func(void_void_fptr func);
 void set_fast_pwm_timer0(uint8_t pwm);
+
 
 
 //**********************************************************//
@@ -125,7 +129,6 @@ void compa_int_delay_s(uint16_t seconds, tccrb_reg& tccrb, volatile uint16_t* oc
 template<typename CyType, typename RetType=uint32_t>
 RetType cycles_to_ms(CyType cycles, uint16_t _prescaler){
 	RetType f_cpu = (F_CPU/_prescaler)/1000;
-	return cycles/f_cpu;
 	if(_prescaler < 256){
 		return cycles/f_cpu;
 	}
@@ -164,6 +167,47 @@ uint16_t get_prescaler_value(tccrb_reg &tccrb);
 //    TIMER CLASSES                                         //
 //**********************************************************//
 
+struct TimeStamp{
+	/*
+	 * TimeStamp with 1s resolution
+	 */
+private:
+	uint32_t timestamp_s=0;
+	static char* buffer;
+
+public:
+	uint16_t day=0;
+	uint8_t hour=0;
+	uint8_t minute=0;
+	uint8_t second=0;
+
+
+	TimeStamp(uint16_t days, uint8_t hours, uint8_t minutes, uint8_t seconds):
+		day(days), hour(hours), minute(minutes), second(seconds)
+	{};
+	TimeStamp(){
+		day = 0;
+		hour = 0;
+		minute = 0;
+		second = 0;
+	}
+
+	TimeStamp(uint32_t raw_time_s);
+	void init_from_seconds(uint32_t raw_time_s);
+	uint32_t to_seconds();
+
+	TimeStamp operator+(TimeStamp& other){
+		return TimeStamp(other.to_seconds() + to_seconds());
+	}
+
+	operator uint32_t(){
+		return to_seconds();
+	}
+
+	void normalize(uint32_t max_value);
+
+	operator const char*();
+};
 
 class Timer;
 /*
@@ -187,16 +231,10 @@ protected:
 	timsk_reg& timsk;
 	tccra_reg& tccra;
 	tccrb_reg& tccrb;
-	uint16_t toi_count=0;
+	volatile uint16_t toi_count=0;
 
 public:
-
-	struct TimeStamp{
-		uint16_t days;
-		uint8_t hours;
-		uint8_t minutes;
-		uint8_t seconds;
-	};
+	static bool timer_type;
 
 	Timer(TccrbClockSelect::pre prescaler, timsk_reg& timsk, tccra_reg& tccra, tccrb_reg& tccrb):
 		prescaler(prescaler), timsk(timsk), tccra(tccra), tccrb(tccrb){
@@ -216,7 +254,7 @@ public:
 	}
 
 	uint32_t get_ms(){
-		return cycles_to_ms<uint16_t>(toi_count*65535, 1);
+		return cycles_to_ms<uint32_t>(toi_count*65536, get_prescaler());
 	}
 
 	int16_t get_prescaler(){
@@ -227,12 +265,15 @@ public:
 		return TimeCount(this);
 	}
 
+
 	uint32_t max_range_ms();
 	uint32_t max_range_sec();
 	uint32_t max_range_min();
 	uint32_t max_range_hours();
 	uint32_t max_range_days();
 	TimeStamp max_range();
+	TimeStamp now();
+
 };
 
 
@@ -249,6 +290,33 @@ public:
 	TimerT(const TimerT& source):
 		Timer(source.prescaler, source.timsk, source.tccra, source.tccrb), tcnt(source.tcnt){
 	};
+	uint32_t get_timestamp(){
+		/*
+		 * Returns raw timestamp: 0xFFFF * toi_count + tcnt
+		 * if timer is 16bit.
+		 */
+		return ((uint32_t)toi_count << (sizeof(TType)*8)) + (uint32_t)tcnt;
+	}
+
+	uint32_t get_timestamp_s(){
+		/*
+		 * Returns raw timestamp in seconds
+		 */
+		return to_seconds(get_timestamp());
+	}
+
+	uint32_t to_cycles(uint32_t seconds)
+	{
+		uint32_t cycles_per_second = F_CPU/get_prescaler();
+		return seconds * cycles_per_second;
+	}
+
+	uint32_t to_seconds(uint32_t cycles)
+	{
+		uint32_t cycles_per_second = F_CPU/get_prescaler();
+		return cycles/cycles_per_second;
+	}
+
 };
 
 
@@ -257,7 +325,7 @@ class Timer1: public TimerT<uint16_t>{
 	 * 16bit Timer1
 	 */
 public:
-	static uint16_t* toi_count_ptr;
+	volatile static uint16_t* toi_count_ptr;
 	Timer1(TccrbClockSelect::pre = TccrbClockSelect::pre1);
 	Timer1(const Timer1& source);
 };
