@@ -224,8 +224,6 @@ Timer1::Timer1(TccrbClockSelect::pre prescaler):
 	tccrb.cs = prescaler;
 	timsk.toie = true;
 	toi_count_ptr = &toi_count;
-
-	toi_count = 0xff00;
 }
 
 Timer1::Timer1(const Timer1& source):

@@ -170,6 +170,7 @@ uint16_t get_prescaler_value(tccrb_reg &tccrb);
 struct TimeStamp{
 	/*
 	 * TimeStamp with 1s resolution
+	 * TODO: rework to support ms
 	 */
 private:
 	uint32_t timestamp_s=0;
