@@ -94,6 +94,16 @@ int task3(){
 	return printf("taks3\n");
 }
 
+int recursive_task(){
+	arduino_led = PIN::lo;
+	arduino_led.set(Task_Scheduler.put(
+			SimpleTask(
+					TimeStamp(timer1.get_timestamp_s()),
+					recursive_task)
+			));
+	return printf("recur:\n%s\n", (const char*)timer1.now());
+}
+
 
 int main(){
 	setup_stdout_for_printf();
@@ -101,13 +111,20 @@ int main(){
 	out_compare_0A = PIN::lo;
 	enable_pcint_check_interrupt();
 	sei();
-//	Task_Scheduler.put(
-//			SimpleTask(
-//					TimeStamp(timer1.get_timestamp_s() + 3),
-//					task3)
-//			);
-//
 	printf("now\n%s\n\n", (const char*)timer1.now());
+
+
+	//**********************************************************//
+	//    SCHEDULE SOME TEST TASKS                              //
+	//**********************************************************//
+
+	Task_Scheduler.put(
+			SimpleTask(
+					TimeStamp(timer1.get_timestamp_s() + 3),
+					task3)
+			);
+
+
 	Task_Scheduler.put(
 			SimpleTask(
 					TimeStamp(timer1.get_timestamp_s() + 10),
@@ -115,19 +132,21 @@ int main(){
 			);
 
 	uint16_t cnt;
-	printf("range\n");
+
+	printf("max timer range as TimeStamp\n");
 	printf("%s\n", (const char*)timer1.max_range());
+	recursive_task();
 	_delay_ms(1000);
 	while(true){
 		_delay_ms(LOOP_PERIOD);
 		Task_Scheduler.check();
-		if(not (cnt++%2)){
-//			printf("%s\n", (const char*)timer1.now());
-		}
+//		Task_Scheduler.put(
+//				SimpleTask(
+//						TimeStamp(timer1.get_timestamp_s() + 1),
+//						recursive_task)
+//				);
 
-//		printf("%lX\n", timer1.to_cycles(5));
-//		printf("%lu\n", cycles_to_sec(task_scheduler.check(), 1024));
-//		printf("%lu\n", timer1.get_timestamp());
+
 
 	}
 }
