@@ -11,17 +11,22 @@ AvrPin button			(PIN::pin0, (AvrPort&)PINB, PIN::in);	//Arduino D08
 AvrPin ext_diode		(PIN::pin7, (AvrPort&)PIND, PIN::out);	//Arduino D07
 AvrPin out_compare_0A	(PIN::pin6, (AvrPort&)PIND, PIN::out);	//Arduino D06
 
-Usart usart(usart0, 9600, 20, 20);
+#define baud	9600
+#define rx_buff_size	20
+#define tx_buff_size	40
+Usart usart(usart0, baud, rx_buff_size, tx_buff_size);
+
 
 Timer1 timer1(TccrbClockSelect::pre8);
 Tasks<SimpleTask , Timer1> Task_Scheduler(timer1);
 
 char* STR_BUFFER = (char*)malloc(50);
 
-/****************************************************************/
-/*
- * Configuration of standard output for functions printf, printf_p and so on
- */
+
+//**********************************************************//
+//    CONFIGURE STDOUT/STDERR                               //
+//**********************************************************//
+
 static int put(char c, FILE *stream){
 	usart.Putchar(c);
 	return 0;
