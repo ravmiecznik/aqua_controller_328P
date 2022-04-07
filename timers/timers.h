@@ -173,7 +173,7 @@ struct TimeStamp{
 	 * TODO: rework to support ms
 	 */
 private:
-	uint32_t timestamp_s=0;
+//	uint32_t timestamp_s=0;
 	static char* buffer;
 
 public:

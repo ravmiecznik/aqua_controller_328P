@@ -179,9 +179,11 @@ public:
 		TaskType task = SortedStack<TaskType>::peek();
 		uint32_t task_timestamp = task.tstamp.to_seconds();
 		uint32_t current_time_s = timer.get_timestamp_s();
-		if( current_time_s >= task_timestamp and task_timestamp - current_time_s < overflow_protection_margin_s){	//overflow protection
-			task = SortedStack<TaskType>::get();
+//		if( current_time_s >= task_timestamp and task_timestamp - current_time_s < overflow_protection_margin_s){	//overflow protection
+		if( current_time_s >= task_timestamp and task_timestamp){
+				task = SortedStack<TaskType>::get();
 			if(task.run()){
+				// re-check after valid task execution, next task may have the same time stamp
 				check();
 			}
 		}
