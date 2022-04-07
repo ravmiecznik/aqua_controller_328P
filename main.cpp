@@ -17,9 +17,9 @@
 #include "relay_controller/relay_controller.h"
 
 
-#if LOOP_PERIOD > 1000
-	#error "LOOP_PERIOD exceed 1000"
-#endif
+//#if LOOP_PERIOD > 1000
+//	#error "LOOP_PERIOD exceed 1000"
+//#endif
 
 
 volatile uint16_t GUARD_COUNTER=0;
@@ -95,6 +95,7 @@ int relay_off_task(){
 					relay_on_task)
 			);
 	printf("set: %d ", set);
+	printf("now\n%s\n\n", (const char*)timer1.now());
 	return printf("%s\n", __FUNCTION__);
 
 }
@@ -119,14 +120,8 @@ int main(){
 
 	printf("max timer range as TimeStamp\n");
 	printf("%s\n", (const char*)timer1.max_range());
-//	relay_on_task();
+	relay_on_task();
 //	relay_off_task();
-
-	Task_Scheduler.put(
-			SimpleTask(
-					TimeStamp(timer1.get_timestamp_s() + 20),
-					relay_on_task)
-			);
 	_delay_ms(1000);
 	while(true){
 		_delay_ms(LOOP_PERIOD);
