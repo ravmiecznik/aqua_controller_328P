@@ -16,6 +16,9 @@
 #define __ASSERT_USE_STDERR
 #include <assert.h>
 
+#include "../build_setup.h"
+
+
 typedef volatile uint8_t& reg8b_ref;
 typedef void (*void_void_fptr)(void);
 void register_timer1_compa_func(void_void_fptr func);
@@ -119,9 +122,6 @@ struct waveform_generation_mode_bit_selection {
 //    AUXILIARY FUNCTIONS                                   //
 //**********************************************************//
 
-
-void setup_timer_ociea(tccrb_reg& tccrb, timsk_reg& timsk, TccrbClockSelect::pre clock_select);
-void compa_int_delay(uint16_t seconds);
 
 void compa_int_delay_s(uint16_t seconds, tccrb_reg& tccrb, volatile uint16_t* ocr);
 

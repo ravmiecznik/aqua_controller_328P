@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <avr/pgmspace.h>
+#include "../build_setup.h"
 
 /*
  * Example Task usage
@@ -88,8 +89,10 @@ public:
 
 	Fptr run(){
 		if(executable){
+#ifdef DEBUG
 			printf_P(PSTR("##Task##\n"));
 			printf(tstamp);
+#endif
 			return (Fptr)executable();
 		}
 		else{

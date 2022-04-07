@@ -1,4 +1,5 @@
 #include "setup.h"
+#include "build_setup.h"
 
 
 
@@ -13,14 +14,22 @@ AvrPin out_compare_0A	(PIN::pin6, (AvrPort&)PIND, PIN::out);	//Arduino D06
 
 #define baud	9600
 #define rx_buff_size	20
-#define tx_buff_size	40
+#define tx_buff_size	50
 Usart usart(usart0, baud, rx_buff_size, tx_buff_size);
 
 
 Timer1 timer1(TccrbClockSelect::pre8);
 Tasks<SimpleTask , Timer1> Task_Scheduler(timer1);
 
+#ifdef DEBUG
+
 char* STR_BUFFER = (char*)malloc(50);
+
+#else
+
+char STR_BUFFER[] = "0";
+
+#endif
 
 
 //**********************************************************//
