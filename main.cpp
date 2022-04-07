@@ -14,6 +14,7 @@
 #include "setup.h"
 #include "pgm_data.h"
 #include "timers/timers.h"
+#include "relay_controller/relay_controller.h"
 
 
 #if LOOP_PERIOD > 1000
@@ -72,43 +73,37 @@ uint32_t loop_seconds(uint32_t loop_count){
 
 
 
+int relay_off_task();
 
-
-int led_toggle(){
-	char c[] = "rafal\n";
-	arduino_led.toggle();
-	printf(c);
-	return 0;
-}
-
-int task1(){
-	return printf("taks1\n");
-}
-
-int task2(){
-	return printf("taks2\n");
-}
-
-
-int task3(){
-	return printf("taks3\n");
-}
-
-int recursive_task(){
-	arduino_led = PIN::lo;
-	arduino_led.set(Task_Scheduler.put(
+int relay_on_task(){
+	RELAY1.activate();
+	bool set = Task_Scheduler.put(
 			SimpleTask(
-					TimeStamp(timer1.get_timestamp_s()),
-					recursive_task)
-			));
-	return printf("recur:\n%s\n", (const char*)timer1.now());
+					TimeStamp(timer1.get_timestamp_s() + 4),
+					relay_off_task)
+			);
+	printf("set: %d ", set);
+	printf("now\n%s\n\n", (const char*)timer1.now());
+	return printf("%s\n", __FUNCTION__);
+}
+
+int relay_off_task(){
+	RELAY1.deactivate();
+	bool set = Task_Scheduler.put(
+			SimpleTask(
+					TimeStamp(timer1.get_timestamp_s() + 4),
+					relay_on_task)
+			);
+	printf("set: %d ", set);
+	return printf("%s\n", __FUNCTION__);
+
 }
 
 
 int main(){
 	setup_stdout_for_printf();
 	level_sensor_low = PIN::hi;
-	out_compare_0A = PIN::lo;
+	relay1_ctrl = PIN::lo;
 	enable_pcint_check_interrupt();
 	sei();
 	printf("now\n%s\n\n", (const char*)timer1.now());
@@ -118,28 +113,31 @@ int main(){
 	//    SCHEDULE SOME TEST TASKS                              //
 	//**********************************************************//
 
-	Task_Scheduler.put(
-			SimpleTask(
-					TimeStamp(timer1.get_timestamp_s() + 3),
-					task3)
-			);
 
-
-	Task_Scheduler.put(
-			SimpleTask(
-					TimeStamp(timer1.get_timestamp_s() + 10),
-					task2)
-			);
 
 	uint16_t cnt;
 
 	printf("max timer range as TimeStamp\n");
 	printf("%s\n", (const char*)timer1.max_range());
-	recursive_task();
+//	relay_on_task();
+//	relay_off_task();
+
+	Task_Scheduler.put(
+			SimpleTask(
+					TimeStamp(timer1.get_timestamp_s() + 20),
+					relay_on_task)
+			);
 	_delay_ms(1000);
 	while(true){
 		_delay_ms(LOOP_PERIOD);
 		Task_Scheduler.check();
+//		if(not (cnt++%3)){
+//			RELAY1.activate();
+//		}
+//		else
+//		{
+//			RELAY1.deactivate();
+//		}
 //		Task_Scheduler.put(
 //				SimpleTask(
 //						TimeStamp(timer1.get_timestamp_s() + 1),

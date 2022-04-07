@@ -12,6 +12,7 @@
 #include "atm328_usart/usart.h"
 #include "task_scheduler/task_scheduler.h"
 #include "timers/timers.h"
+#include "relay_controller/relay_controller.h"
 
 
 #define LOOP_PERIOD			500		//cant exceed 1000
@@ -29,10 +30,12 @@ extern AvrPin level_sensor_low;
 extern AvrPin level_sensor_hi;
 extern AvrPin button;
 extern AvrPin ext_diode;
-extern AvrPin out_compare_0A;
+extern AvrPin relay1_ctrl;
 
 extern Usart usart;
 extern Timer1 timer1;
+
+extern RelayController RELAY1;
 
 typedef int (*fptr_int_void)(void);
 typedef Task<TimeStamp, fptr_int_void> SimpleTask;

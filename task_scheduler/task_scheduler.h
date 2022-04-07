@@ -157,6 +157,7 @@ class Tasks: public SortedStack<TaskType>
  */
 {
 private:
+	uint32_t overflow_protection_margin_s=10;
 	Timer& timer;
 
 public:
@@ -166,7 +167,7 @@ public:
 
 	bool put(TaskType t){
 		if(t.tstamp.to_seconds() > timer.max_range_sec()){
-			t.tstamp.normalize(timer.max_range_sec());	//overflow protection
+			t.tstamp.fix_overflow(timer.max_range_sec());	//overflow protection
 		}
 		return SortedStack<TaskType>::put(t);
 	}
@@ -176,9 +177,13 @@ public:
 		 * Run task according to its time stamp
 		 */
 		TaskType task = SortedStack<TaskType>::peek();
-		if(timer.get_timestamp_s() >= task.tstamp.to_seconds()){
+		uint32_t task_timestamp = task.tstamp.to_seconds();
+		uint32_t current_time_s = timer.get_timestamp_s();
+		if( current_time_s >= task_timestamp and task_timestamp - current_time_s < overflow_protection_margin_s){	//overflow protection
 			task = SortedStack<TaskType>::get();
-			task.run();
+			if(task.run()){
+				check();
+			}
 		}
 	}
 

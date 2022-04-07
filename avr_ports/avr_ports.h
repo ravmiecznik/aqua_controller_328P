@@ -135,7 +135,7 @@ public:
 	void set(pin_state state){
 		port.set_pin(pin, state);
 	}
-	void set(uint8_t state){
+	void set(bool state){
 		port.set_pin(pin, state);
 	}
 	void set_dir(pin_direction direction){
@@ -155,7 +155,7 @@ public:
 	void operator=(pin_state state){
 		set(state);
 	}
-	void operator=(uint8_t state){
+	void operator=(bool state){
 		set(state);
 	}
 	operator uint8_t(){

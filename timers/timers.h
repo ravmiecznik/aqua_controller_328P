@@ -205,7 +205,7 @@ public:
 		return to_seconds();
 	}
 
-	void normalize(uint32_t max_value);
+	void fix_overflow(uint32_t max_value);
 
 	operator const char*();
 };

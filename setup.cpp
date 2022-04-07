@@ -10,13 +10,14 @@ AvrPin level_sensor_low	(PIN::pin2, (AvrPort&)PINB, PIN::in);	//Arduino D10
 AvrPin level_sensor_hi	(PIN::pin1, (AvrPort&)PINB, PIN::in);	//Arduino D09
 AvrPin button			(PIN::pin0, (AvrPort&)PINB, PIN::in);	//Arduino D08
 AvrPin ext_diode		(PIN::pin7, (AvrPort&)PIND, PIN::out);	//Arduino D07
-AvrPin out_compare_0A	(PIN::pin6, (AvrPort&)PIND, PIN::out);	//Arduino D06
+AvrPin relay1_ctrl		(PIN::pin6, (AvrPort&)PIND, PIN::out);	//Arduino D06
 
 #define baud	9600
 #define rx_buff_size	20
 #define tx_buff_size	50
 Usart usart(usart0, baud, rx_buff_size, tx_buff_size);
 
+RelayController RELAY1(relay1_ctrl, RelayController::RelayNormalMode::open);
 
 Timer1 timer1(TccrbClockSelect::pre8);
 Tasks<SimpleTask , Timer1> Task_Scheduler(timer1);

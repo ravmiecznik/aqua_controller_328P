@@ -98,10 +98,14 @@ uint32_t TimeStamp::to_seconds(){
 	return total_seconds;
 }
 
-void TimeStamp::normalize(uint32_t max_value){
+void TimeStamp::fix_overflow(uint32_t max_value){
+#ifdef DEBUG
+	printf("FROM\n%s",(const char*)*this);
+#endif
 	init_from_seconds(to_seconds() - max_value);
 #ifdef DEBUG
 	printf("normalized\n%s",(const char*)*this);
+
 #endif
 }
 
@@ -184,7 +188,7 @@ ISR(TIMER1_OVF_vect){
 }
 
 
-volatile uint16_t* Timer1::toi_count_ptr = 0;
+volatile uint16_t* Timer1::toi_count_ptr = nullptr;
 
 Timer1::Timer1(TccrbClockSelect::pre prescaler):
 		TimerT<uint16_t>(prescaler, (timsk_reg&)TIMSK1, (tccra_reg&)TCCR1A, (tccrb_reg&)TCCR1B, (uint16_t&)TCNT1)
@@ -197,6 +201,9 @@ Timer1::Timer1(TccrbClockSelect::pre prescaler):
 Timer1::Timer1(const Timer1& source):
 		TimerT<uint16_t>(source.prescaler, source.timsk, source.tccra, source.tccrb, source.tcnt)
 {
+	/*
+	 * Copying constructor
+	 */
 	tccrb.cs = source.prescaler;
 	timsk.toie = source.timsk.toie;
 	toi_count_ptr = source.toi_count_ptr;
